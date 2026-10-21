@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="新境企业培训智能工具 Demo" />
+    <title>新境培训智能工具 Demo</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2317244d'/%3E%3Cpath d='M18 21h28M18 32h20M18 43h28' stroke='%23c9ff4a' stroke-width='6' stroke-linecap='round'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">新</div>
+          <div><strong>新境</strong><span>培训智能工具</span></div>
+        </div>
+
+        <p class="nav-label">独立工具</p>
+        <nav id="toolNav" aria-label="工具列表"></nav>
+
+        <div class="sidebar-foot">
+          <span class="pulse"></span>
+          <div><strong>演示模式</strong><small>使用示例数据，不消耗 API</small></div>
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <button class="mobile-menu" aria-label="打开工具列表">☰</button>
+          <div class="crumb"><span>新境工具</span><b>/</b><strong id="crumbName">课程开发教练</strong></div>
+          <button class="outline-button" id="modelButton">连接我的大模型</button>
+        </header>
+
+        <section class="workspace" id="workspace"></section>
+      </main>
+    </div>
+
+    <dialog id="modelDialog">
+      <button class="dialog-close" aria-label="关闭">×</button>
+      <span class="eyebrow">模型连接</span>
+      <h2>使用你自己的大模型</h2>
+      <p>正式版会在这里连接学员自己的 API。当前 Demo 使用内置示例，不会保存或调用密钥。</p>
+      <label>模型服务商<select><option>阿里云百炼</option><option>DeepSeek</option><option>OpenAI</option><option>其他兼容接口</option></select></label>
+      <label>API Key<input type="password" placeholder="粘贴你的 API Key" /></label>
+      <button class="primary-button" id="fakeConnect">测试连接</button>
+    </dialog>
+    <div id="toast" role="status" aria-live="polite"></div>
+    <script src="./app.js"></script>
+  </body>
+</html>
