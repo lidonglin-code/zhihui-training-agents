@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#080b13" />
+    <meta name="description" content="知汇：面向真实任务的企业培训 AI 智能体团队。" />
+    <title>知汇 · 企业培训 AI 智能体团队</title>
+    <script>
+      // 导航点击不留下锚点；刷新时恢复真实滚动位置，而非跳回某位智能体。
+      if ("scrollRestoration" in history) history.scrollRestoration = "auto";
+      if (location.hash) {
+        try { history.replaceState(history.state, "", location.pathname + location.search); }
+        catch { /* 某些 file:// 浏览器不允许改写地址。 */ }
+      }
+      const scrollPositionKey = "xinjing-introduce-scroll:" + location.pathname;
+      addEventListener("pagehide", () => {
+        try { sessionStorage.setItem(scrollPositionKey, String(scrollY)); }
+        catch { /* 不能使用会话存储时由浏览器自行恢复。 */ }
+      });
+      addEventListener("pageshow", () => {
+        if (performance.getEntriesByType("navigation")[0]?.type !== "reload") return;
+        let savedPosition;
+        try {
+          const storedPosition = sessionStorage.getItem(scrollPositionKey);
+          if (storedPosition === null) return;
+          savedPosition = Number(storedPosition);
+        }
+        catch { return; }
+        if (!Number.isFinite(savedPosition) || savedPosition < 0) return;
+        const previousBehavior = document.documentElement.style.scrollBehavior;
+        document.documentElement.style.scrollBehavior = "auto";
+        scrollTo(0, savedPosition);
+        document.documentElement.style.scrollBehavior = previousBehavior;
+      });
+    </script>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23080b13'/%3E%3Cpath d='M17 21h30M17 32h22M17 43h30' stroke='%23e8e2d7' stroke-width='6' stroke-linecap='round'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">跳到正文</a>
+    <header class="site-header">
+      <a class="brand" href="#top" aria-label="知汇，回到介绍页顶部">
+        <span class="brand-logo"><img src="../assets/brand/zhihui-wordmark-angular-v2.png" alt="" /></span>
+        <span class="brand-descriptor">企业培训 AI 智能体团队</span>
+      </a>
+      <nav class="product-index" id="productIndex" aria-label="八位智能体快速导航"><!-- BEGIN PRODUCT INDEX -->
+    <a href="#project" data-index-link="project" aria-label="01 项目架构顾问" title="项目架构顾问">
+      <i>01</i><b>项目架构</b>
+    </a>
+    <a href="#expert" data-index-link="expert" aria-label="02 经验萃取专家" title="经验萃取专家">
+      <i>02</i><b>经验萃取</b>
+    </a>
+    <a href="#case" data-index-link="case" aria-label="03 案例开发专家" title="案例开发专家">
+      <i>03</i><b>案例开发</b>
+    </a>
+    <a href="#course" data-index-link="course" aria-label="04 微课开发专家" title="微课开发专家">
+      <i>04</i><b>微课开发</b>
+    </a>
+    <a href="#quiz" data-index-link="quiz" aria-label="05 智能题库助手" title="智能题库助手">
+      <i>05</i><b>智能题库</b>
+    </a>
+    <a href="#activity" data-index-link="activity" aria-label="06 活动设计专家" title="活动设计专家">
+      <i>06</i><b>活动设计</b>
+    </a>
+    <a href="#copy" data-index-link="copy" aria-label="07 运营文案助手" title="运营文案助手">
+      <i>07</i><b>运营文案</b>
+    </a>
+    <a href="#evaluation" data-index-link="evaluation" aria-label="08 培训评估顾问" title="培训评估顾问">
+      <i>08</i><b>培训评估</b>
+    </a><!-- END PRODUCT INDEX --></nav>
+      <div class="header-actions">
+        <a class="header-cta" href="../#home">进入工作台</a>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="hero" id="top" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <div class="hero-brand">
+            <span class="brand-logo brand-logo--hero"><img src="../assets/brand/zhihui-wordmark-angular-v2.png" alt="" /></span>
+          </div>
+          <h1 id="hero-title"><span class="visually-hidden">知汇 · </span><span>企业培训</span> <span><span class="hero-title-gold">AI 智能体</span>团队</span></h1>
+          <p class="hero-lead">围绕真实培训任务，梳理材料、厘清问题、形成专业成果。</p>
+          <div class="hero-actions">
+            <a class="button button-primary" href="#products">查看智能体</a>
+          </div>
+        </div>
+        <figure class="hero-visual">
+          <div class="hero-photo" role="img" aria-label="八位企业培训 AI 智能体合照">
+            <img src="../assets/characters/agents-v1/expert.png" alt="" />
+            <img src="../assets/characters/agents-v1/project.png" alt="" />
+            <img src="../assets/characters/agents-v1/course.png" alt="" />
+            <img src="../assets/characters/agents-v1/case.png" alt="" />
+            <img src="../assets/characters/agents-v1/activity.png" alt="" />
+            <img src="../assets/characters/agents-v1/quiz.png" alt="" />
+            <img src="../assets/characters/agents-v1/evaluation.png" alt="" />
+            <img src="../assets/characters/agents-v1/copy.png" alt="" />
+          </div>
+        </figure>
+      </section>
+
+      <section class="value-section section" id="value" aria-labelledby="value-title">
+        <header class="section-heading">
+          <div>
+            <span class="eyebrow">从真实任务开始</span>
+            <h2 id="value-title">复杂的方法留给系统。<br>清楚的选择留给你。</h2>
+          </div>
+          <p>简单不等于省略专业判断。每个产品都把自己的方法、成果结构和质量红线放进后台，让你从真实材料直接开始。</p>
+        </header>
+        <div class="value-grid">
+          <article><span>01 / 输入</span><h3>把手头材料交进来</h3><p>一句需求、访谈稿、课程资料、制度文件或旧方案都能成为起点；缺失事实会明确标记，不用先学提示词。</p></article>
+          <article><span>02 / 方法</span><h3>让专业方法真正工作</h3><p>不同产品采用不同的分析视角和输出骨架。方法不是装饰标签，而会改变系统如何判断、追问和组织成果。</p></article>
+          <article><span>03 / 成果</span><h3>得到能继续工作的底稿</h3><p>结果可以编辑、复制、继续修改和导出；来源、待确认项与使用边界随成果一起保留。</p></article>
+        </div>
+      </section>
+
+      <section class="products-section section" id="products" aria-label="培训智能体介绍">
+        <div id="productStories" class="product-stories"><!-- BEGIN PRODUCT STORIES -->
+      <article class="product-story product-story--generated-art" id="project" style="--product-accent:#75a8b5;--word-main:#b7d0d5;--word-role:#5e8391;--word-main-dark:#6f91a0;--word-role-dark:#a2c8d2" data-product-story>
+        <div class="product-visual">
+          <div class="portrait-frame"><span class="generated-wordfield generated-wordfield--back" style="--wordfield-image:url('../assets/characters/agents-v1/project-wordfield-v1.png')" aria-hidden="true"></span>
+         <span class="generated-wordfield generated-wordfield--role" style="--wordfield-image:url('../assets/characters/agents-v1/project-wordfield-v1.png')" aria-hidden="true"></span>
+         <img class="generated-person" src="../assets/characters/agents-v1/project.png" alt="项目架构顾问高清人物形象">
+         <span class="generated-wordfield generated-wordfield--front generated-wordfield--front-mid" style="--wordfield-image:url('../assets/characters/agents-v1/project-wordfield-v1.png')" aria-hidden="true"></span>
+         <span class="generated-wordfield generated-wordfield--front generated-wordfield--front-low" style="--wordfield-image:url('../assets/characters/agents-v1/project-wordfield-v1.png')" aria-hidden="true"></span></div>
+        </div>
+        <div class="product-copy">
+          
+          <h3 class="visually-hidden">项目架构顾问</h3>
+          <span class="product-kicker">01 / 项目设计</span>
+          <p class="tagline"><span>先判断是不是培训问题，<br>再设计一套真正能落地的项目。</span></p>
+          <p class="summary">从培训需求出发，连接业务问题、岗位行为、学习内容、实践任务、主管支持和评估证据。</p>
+          <div class="product-essentials">
+            <div><span>适合</span><p>领导提出一句“做一期培训”，需要形成可立项方案</p></div>
+            <div><span>成果</span><p>立项判断与三层需求 · 目标、内容与干预组合 · 实施运营、评估与风险</p></div>
+          </div>
+          <div class="product-actions">
+            <a class="button" href="../#project">进入项目架构顾问</a>
+          </div>
+        </div>
+      </article>
+      <article class="product-story product-story--generated-art" id="expert" style="--product-accent:#aaa6d3;--word-main:#c6c2dc;--word-role:#6f7f9b;--word-main-dark:#85839f;--word-role-dark:#aebfda" data-product-story>
+        <div class="product-visual">
+          <div class="portrait-frame"><span class="generated-wordfield generated-wordfield--back" style="--wordfield-image:url('../assets/characters/agents-v1/expert-wordfield-v1.png')" aria-hidden="true"></span>
+         <span class="generated-wordfield generated-wordfield--role" style="--wordfield-image:url('../assets/characters/agents-v1/expert-wordfield-v1.png')" aria-hidden="true"></span>
+         <img class="generated-person" src="../assets/characters/agents-v1/expert.png" alt="经验萃取专家高清人物形象">
+         <span class="generated-wordfield generated-wordfield--front generated-wordfield--front-mid" style="--wordfield-image:url('../assets/characters/agents-v1/expert-wordfield-v1.png')" aria-hidden="true"></span>
+         <span class="generated-wordfield generated-wordfield--front generated-wordfield--front-low" style="--wordfield-image:url('../assets/characters/agents-v1/expert-wordfield-v1.png')" aria-hidden="true"></span></div>
+        </div>
+        <div class="product-copy">
+          
+          <h3 class="visually-hidden">经验萃取专家</h3>
+          <span class="product-kicker">02 / 经验萃取</span>
+          <p class="tagline"><span>把高手说不清的经验，变成别人做得到的判断。</span></p>
+          <p class="summary">从访谈、复盘和真实事件中还原情境线索、判断规则、关键动作与适用边界。</p>
+          <div class="product-essentials">
+            <div><span>适合</span><p>已有专家访谈或复盘材料，需要形成经验素材包</p></div>
+            <div><span>成果</span><p>关键事件与证据锚点 · 判断规则与任务做法图 · 待追问问题与适用边界</p></div>
+          </div>
+          <div class="product-actions">
+            <a class="button" href="../#expert">进入经验萃取专家</a>
+          </div>
+        </div>
+      </article>
+      <article class="product-story product-story--generated-art" id="case" style="--product-accent:#c1a373;--word-main:#d0beb5;--word-role:#866b60;--word-main-dark:#88736c;--word-role-dark:#c9a797" data-product-story>
+        <div class="product-visual">
+          <div class="portrait-frame"><span class="generated-wordfield generated-wordfield--back" style="--wordfield-image:url('../assets/characters/agents-v1/case-wordfield-v1.png')" aria-hidden="true"></span>
+         <span class="generated-wordfield generated-wordfield--role" style="--wordfield-image:url('../assets/characters/agents-v1/case-wordfield-v1.png')" aria-hidden="true"></span>
+         <img class="generated-person" src="../assets/characters/agents-v1/case.png" alt="案例开发专家高清人物形象">
+         <span class="generated-wordfield generated-wordfield--front generated-wordfield--front-mid" style="--wordfield-image:url('../assets/characters/agents-v1/case-wordfield-v1.png')" aria-hidden="true"></span>
+         <span class="generated-wordfield generated-wordfield--front generated-wordfield--front-low" style="--wordfield-image:url('../assets/characters/agents-v1/case-wordfield-v1.png')" aria-hidden="true"></span></div>
+        </div>
+        <div class="product-copy">
+          
+          <h3 class="visually-hidden">案例开发专家</h3>
+          <span class="product-kicker">03 / 案例开发</span>
+          <p class="tagline"><span>把真实工作事件，做成让学员练习判断的教学案例。</span></p>
+          <p class="summary">围绕一个具体主角、具体时刻和具体选择，编排事实、约束与合理分歧。</p>
+          <div class="product-essentials">
+            <div><span>适合</span><p>把业务故事或访谈材料转成课堂案例</p></div>
+            <div><span>成果</span><p>决策焦点与事实库 · 不泄题的学员版案例 · 讲师笔记、板书与带课时间表</p></div>
+          </div>
+          <div class="product-actions">
+            <a class="button" href="../#case">进入案例开发专家</a>
+          </div>
+        </div>
+      </article>
+      <article class="product-story product-story--generated-art" id="course" style="--product-accent:#c98f82;--word-main:#c5d2e3;--word-role:#8b6f84;--word-main-dark:#7f91aa;--word-role-dark:#c4a3ba" data-product-story>
+        <div class="product-visual">
+          <div class="portrait-frame"><span class="generated-wordfield generated-wordfield--back" style="--wordfield-image:url('../assets/characters/agents-v1/course-wordfield-v1.png')" aria-hidden="true"></span>
+         <span class="generated-wordfield generated-wordfield--role" style="--wordfield-image:url('../assets/characters/agents-v1/course-wordfield-v1.png')" aria-hidden="true"></span>
+         <img class="generated-person" src="../assets/characters/agents-v1/course.png" alt="微课开发专家高清人物形象">
+         <span class="generated-wordfield generated-wordfield--front generated-wordfield--front-mid" style="--wordfield-image:url('../assets/characters/agents-v1/course-wordfield-v1.png')" aria-hidden="true"></span>
+         <span class="generated-wordfield generated-wordfield--front generated-wordfield--front-low" style="--wordfield-image:url('../assets/characters/agents-v1/course-wordfield-v1.png')" aria-hidden="true"></span></div>
+        </div>
+        <div class="product-copy">
+          
+          <h3 class="visually-hidden">微课开发专家</h3>
+          <span class="product-kicker">04 / 微课开发</span>
+          <p class="tagline"><span>把一个真实小任务，做成能练、<br class="desktop-tagline-break">能反馈、能制作的微课。</span></p>
+          <p class="summary">先判断任务是否适合微课，再把单一目标、时间预算、分镜脚本、主动练习、解释性反馈和发布检查组织成一份制作包。</p>
+          <div class="product-essentials">
+            <div><span>适合</span><p>把常见岗位问题做成 3–10 分钟微课</p></div>
+            <div><span>成果</span><p>微课定位与单一目标 · 带时间码的逐镜脚本 · 练习反馈、资产与发布清单</p></div>
+          </div>
+          <div class="product-actions">
+            <a class="button" href="../#course">进入微课开发专家</a>
+          </div>
+        </div>
+      </article>
+      <article class="product-story product-story--generated-art" id="quiz" style="--product-accent:#83a2c7;--word-main:#b0c3d6;--word-role:#5d7e9f;--word-main-dark:#6e89a5;--word-role-dark:#aac8e4" data-product-story>
+        <div class="product-visual">
+          <div class="portrait-frame"><span class="generated-wordfield generated-wordfield--back" style="--wordfield-image:url('../assets/characters/agents-v1/quiz-wordfield-v1.png')" aria-hidden="true"></span>
+         <span class="generated-wordfield generated-wordfield--role" style="--wordfield-image:url('../assets/characters/agents-v1/quiz-wordfield-v1.png')" aria-hidden="true"></span>
+         <img class="generated-person" src="../assets/characters/agents-v1/quiz.png" alt="智能题库助手高清人物形象">
+         <span class="generated-wordfield generated-wordfield--front generated-wordfield--front-mid" style="--wordfield-image:url('../assets/characters/agents-v1/quiz-wordfield-v1.png')" aria-hidden="true"></span>
+         <span class="generated-wordfield generated-wordfield--front generated-wordfield--front-low" style="--wordfield-image:url('../assets/characters/agents-v1/quiz-wordfield-v1.png')" aria-hidden="true"></span></div>
+        </div>
+        <div class="product-copy">
+          
+          <h3 class="visually-hidden">智能题库助手</h3>
+          <span class="product-kicker">05 / 测评设计</span>
+          <p class="tagline"><span>把课程材料，变成有依据、带解析、可审查的题库。</span></p>
+          <p class="summary">系统先在后台建立能力—证据蓝图，再生成题干、答案、解析、来源与干扰项依据。</p>
+          <div class="product-essentials">
+            <div><span>适合</span><p>把课程、制度或 SOP 快速转成可审核题库</p></div>
+            <div><span>成果</span><p>能力—证据蓝图 · 带答案解析和来源的题库 · 质量问题与人工复核队列</p></div>
+          </div>
+          <div class="product-actions">
+            <a class="button" href="../#quiz">进入智能题库助手</a>
+          </div>
+        </div>
+      </article>
+      <article class="product-story product-story--generated-art" id="activity" style="--product-accent:#ad9aca;--word-main:#ddb7b0;--word-role:#9d6678;--word-main-dark:#9b7471;--word-role-dark:#d6a3b2" data-product-story>
+        <div class="product-visual">
+          <div class="portrait-frame"><span class="generated-wordfield generated-wordfield--back" style="--wordfield-image:url('../assets/characters/agents-v1/activity-wordfield-v1.png')" aria-hidden="true"></span>
+         <span class="generated-wordfield generated-wordfield--role" style="--wordfield-image:url('../assets/characters/agents-v1/activity-wordfield-v1.png')" aria-hidden="true"></span>
+         <img class="generated-person" src="../assets/characters/agents-v1/activity.png" alt="活动设计专家高清人物形象">
+         <span class="generated-wordfield generated-wordfield--front generated-wordfield--front-mid" style="--wordfield-image:url('../assets/characters/agents-v1/activity-wordfield-v1.png')" aria-hidden="true"></span>
+         <span class="generated-wordfield generated-wordfield--front generated-wordfield--front-low" style="--wordfield-image:url('../assets/characters/agents-v1/activity-wordfield-v1.png')" aria-hidden="true"></span></div>
+        </div>
+        <div class="product-copy">
+          
+          <h3 class="visually-hidden">活动设计专家</h3>
+          <span class="product-kicker">06 / 活动设计</span>
+          <p class="tagline"><span>不是再找一个热闹游戏，<br class="desktop-tagline-break">而是编排一次可观察的学习。</span></p>
+          <p class="summary">从学员要做出的可观察产出出发，在人数、时间、场地和材料约束下选择活动机制，生成逐分钟运行脚本、观察证据、结构化复盘与现场 Plan B。</p>
+          <div class="product-essentials">
+            <div><span>适合</span><p>在一段课程中加入练习、讨论或模拟</p></div>
+            <div><span>成果</span><p>机制选择与达标规准 · 逐分钟讲师运行单 · 复盘反馈、迁移动作与 Plan B</p></div>
+          </div>
+          <div class="product-actions">
+            <a class="button" href="../#activity">进入活动设计专家</a>
+          </div>
+        </div>
+      </article>
+      <article class="product-story product-story--generated-art" id="copy" style="--product-accent:#79a48f;--word-main:#d8c4a5;--word-role:#8a704b;--word-main-dark:#927a58;--word-role-dark:#d8c195" data-product-story>
+        <div class="product-visual">
+          <div class="portrait-frame"><span class="generated-wordfield generated-wordfield--back" style="--wordfield-image:url('../assets/characters/agents-v1/copy-wordfield-v1.png')" aria-hidden="true"></span>
+         <span class="generated-wordfield generated-wordfield--role" style="--wordfield-image:url('../assets/characters/agents-v1/copy-wordfield-v1.png')" aria-hidden="true"></span>
+         <img class="generated-person" src="../assets/characters/agents-v1/copy.png" alt="运营文案助手高清人物形象">
+         <span class="generated-wordfield generated-wordfield--front generated-wordfield--front-mid" style="--wordfield-image:url('../assets/characters/agents-v1/copy-wordfield-v1.png')" aria-hidden="true"></span>
+         <span class="generated-wordfield generated-wordfield--front generated-wordfield--front-low" style="--wordfield-image:url('../assets/characters/agents-v1/copy-wordfield-v1.png')" aria-hidden="true"></span></div>
+        </div>
+        <div class="product-copy">
+          
+          <h3 class="visually-hidden">运营文案助手</h3>
+          <span class="product-kicker">07 / 项目运营</span>
+          <p class="tagline"><span>不是把通知写得好看，而是推动一个明确行动。</span></p>
+          <p class="summary">从活动材料中提取对象、行动、截止时间、入口和参与收益，诊断行动阻力，再按首发、提醒、临期等时点生成真正适配渠道的完整文案与发布检查。</p>
+          <div class="product-essentials">
+            <div><span>适合</span><p>发布招募、报名、开课提醒、作业催交或课后跟进</p></div>
+            <div><span>成果</span><p>活动事实与阻力判断 · 2–4 条分阶段完整文案 · 触达节奏与发布检查</p></div>
+          </div>
+          <div class="product-actions">
+            <a class="button" href="../#copy">进入运营文案助手</a>
+          </div>
+        </div>
+      </article>
+      <article class="product-story product-story--generated-art" id="evaluation" style="--product-accent:#b18eaa;--word-main:#cbb3c7;--word-role:#87647f;--word-main-dark:#8d7188;--word-role-dark:#c8a5c1" data-product-story>
+        <div class="product-visual">
+          <div class="portrait-frame"><span class="generated-wordfield generated-wordfield--back" style="--wordfield-image:url('../assets/characters/agents-v1/evaluation-wordfield-v1.png')" aria-hidden="true"></span>
+         <span class="generated-wordfield generated-wordfield--role" style="--wordfield-image:url('../assets/characters/agents-v1/evaluation-wordfield-v1.png')" aria-hidden="true"></span>
+         <img class="generated-person" src="../assets/characters/agents-v1/evaluation.png" alt="培训评估顾问高清人物形象">
+         <span class="generated-wordfield generated-wordfield--front generated-wordfield--front-mid" style="--wordfield-image:url('../assets/characters/agents-v1/evaluation-wordfield-v1.png')" aria-hidden="true"></span>
+         <span class="generated-wordfield generated-wordfield--front generated-wordfield--front-low" style="--wordfield-image:url('../assets/characters/agents-v1/evaluation-wordfield-v1.png')" aria-hidden="true"></span></div>
+        </div>
+        <div class="product-copy">
+          
+          <h3 class="visually-hidden">培训评估顾问</h3>
+          <span class="product-kicker">08 / 效果评估</span>
+          <p class="tagline"><span>从真正想知道的问题出发，<br class="desktop-tagline-break">设计能支持决策的评估方案。</span></p>
+          <p class="summary">从谁要依据结果做什么决定开始，设计结果—行为—学习—体验证据链，形成最小可行的数据计划、采集工具和解释边界。</p>
+          <div class="product-essentials">
+            <div><span>适合</span><p>决定项目是否续办、扩展或修改</p></div>
+            <div><span>成果</span><p>评估问题与证据链 · 方法、对象、时点和责任人 · 工具草案与归因边界</p></div>
+          </div>
+          <div class="product-actions">
+            <a class="button" href="../#evaluation">进入培训评估顾问</a>
+          </div>
+        </div>
+      </article><!-- END PRODUCT STORIES --></div>
+      </section>
+
+      <section class="final-cta section">
+        <div class="final-cta-main">
+          <span class="eyebrow">从手头的一项任务开始</span>
+          <h2>懂培训的智能体，<br><span>让专业工作更好做。</span></h2>
+        </div>
+        <div class="final-cta-side">
+          <p>AI 智能体围绕真实任务梳理材料、厘清问题、形成专业成果，让复杂的培训工作更有章法。</p>
+          <a class="button button-primary" href="../#home">进入智能体工作台</a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <a href="#top" aria-label="知汇，回到页面顶部"><span class="brand-logo brand-logo--footer"><img src="../assets/brand/zhihui-wordmark-angular-v2.png" alt="" /></span><span>企业培训 AI 智能体团队</span></a>
+      <p class="footer-credit">培训AI智能体开发者 李东霖</p>
+    </footer>
+
+    <script src="../tools-data.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>

@@ -3,49 +3,97 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="新境企业培训智能工具 Demo" />
-    <title>新境培训智能工具 Demo</title>
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2317244d'/%3E%3Cpath d='M18 21h28M18 32h20M18 43h28' stroke='%23c9ff4a' stroke-width='6' stroke-linecap='round'/%3E%3C/svg%3E" />
+    <meta name="theme-color" content="#080b13" />
+    <meta name="description" content="知汇：把企业培训中的知识、经验与方法，汇成可以直接工作的 AI 智能体团队。" />
+    <title>知汇 · 企业培训 AI 智能体</title>
+    <script>
+      try { document.documentElement.dataset.theme = localStorage.getItem("xinjing-ui-theme") || "dark"; }
+      catch { document.documentElement.dataset.theme = "dark"; }
+    </script>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23080b13'/%3E%3Cpath d='M17 21h30M17 32h22M17 43h30' stroke='%23e8e2d7' stroke-width='6' stroke-linecap='round'/%3E%3C/svg%3E" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <div class="app-shell">
-      <aside class="sidebar">
-        <div class="brand">
-          <div class="brand-mark">新</div>
-          <div><strong>新境</strong><span>培训智能工具</span></div>
-        </div>
-
-        <p class="nav-label">独立工具</p>
-        <nav id="toolNav" aria-label="工具列表"></nav>
-
-        <div class="sidebar-foot">
-          <span class="pulse"></span>
-          <div><strong>演示模式</strong><small>使用示例数据，不消耗 API</small></div>
-        </div>
+    <div class="app" id="app">
+      <aside class="side" id="side">
+        <button class="brand" data-go-home aria-label="返回工具首页">
+          <span class="brand-symbol">知</span>
+          <span><b>知汇</b><small>企业培训 AI 智能体</small></span>
+        </button>
+        <p class="side-label">你的企业培训 AI 团队</p>
+        <nav id="nav" aria-label="产品导航"></nav>
       </aside>
 
       <main class="main">
         <header class="topbar">
-          <button class="mobile-menu" aria-label="打开工具列表">☰</button>
-          <div class="crumb"><span>新境工具</span><b>/</b><strong id="crumbName">课程开发教练</strong></div>
-          <button class="outline-button" id="modelButton">连接我的大模型</button>
+          <button class="menu-button" id="menuButton" aria-label="打开产品导航">☰</button>
+          <div class="breadcrumb"><span>知汇</span><i>/</i><b id="crumb">首页</b></div>
+          <div class="top-actions">
+            <button class="theme-toggle" type="button" data-theme-toggle aria-label="切换为浅色模式"></button>
+            <span class="connection-state" id="connectionState"><i></i>未连接模型</span>
+            <button class="button secondary" id="modelButton">连接我的大模型</button>
+          </div>
         </header>
-
-        <section class="workspace" id="workspace"></section>
+        <div id="page" class="page"></div>
       </main>
     </div>
 
-    <dialog id="modelDialog">
-      <button class="dialog-close" aria-label="关闭">×</button>
-      <span class="eyebrow">模型连接</span>
-      <h2>使用你自己的大模型</h2>
-      <p>正式版会在这里连接学员自己的 API。当前 Demo 使用内置示例，不会保存或调用密钥。</p>
-      <label>模型服务商<select><option>阿里云百炼</option><option>DeepSeek</option><option>OpenAI</option><option>其他兼容接口</option></select></label>
-      <label>API Key<input type="password" placeholder="粘贴你的 API Key" /></label>
-      <button class="primary-button" id="fakeConnect">测试连接</button>
+    <dialog id="modelDialog" class="model-dialog">
+      <button class="dialog-close" data-close-dialog aria-label="关闭">×</button>
+      <span class="kicker">三步快速连接</span>
+      <h2>连接你的大模型</h2>
+      <p>普通用户只需选择服务商并粘贴 API Key，接口和模型由系统自动配置。</p>
+
+      <section class="connect-step provider-step" aria-labelledby="providerStepTitle">
+        <header><i>1</i><div><b id="providerStepTitle">选择模型服务商和生成模式</b></div></header>
+        <div class="connection-choices">
+          <label><span>模型厂商</span><select id="quickProviderSelect" aria-label="模型厂商"><option value="deepseek">DeepSeek</option><option value="siliconflow">硅基流动</option><option value="zhipu">智谱 AI</option><option value="qwen">阿里云百炼</option><option value="kimi">Kimi</option><option value="openai">OpenAI</option></select></label>
+          <label><span>生成模式</span><select id="tierSelect" aria-label="生成模式"><option value="economy">经济</option><option value="balanced" selected>均衡</option><option value="quality">高质量</option></select></label>
+        </div>
+        <div class="model-route" id="modelRoute"><span>本次实际调用</span><b id="modelRouteTitle">DeepSeek · 均衡</b><small id="modelRouteDetail">DeepSeek Flash · 适度思考</small></div>
+      </section>
+
+      <section class="connect-step" aria-labelledby="keyStepTitle">
+        <header><i>2</i><div><b id="keyStepTitle">获取并粘贴 API Key</b></div></header>
+        <button class="key-guide-toggle" id="keyGuideToggle" type="button" aria-expanded="false">我还没有 API Key，教我获取</button>
+        <div class="key-guide" id="keyGuide" hidden>
+          <ol id="keyGuideSteps"></ol>
+          <a class="button ghost" id="keyGuideLink" href="https://platform.deepseek.com/api_keys" target="_blank" rel="noopener">打开官方密钥页面</a>
+        </div>
+        <label class="key-field"><span>粘贴你的 API Key</span>
+          <span class="key-input-wrap"><input id="apiKeyInput" type="password" autocomplete="new-password" placeholder="例如：sk-xxxxxxxx" /><button id="toggleApiKey" type="button" aria-label="显示 API Key">显示</button></span>
+        </label>
+      </section>
+
+      <details class="advanced-settings" id="advancedSettings">
+        <summary>更多服务商与高级设置</summary>
+        <div class="dialog-grid">
+          <label>服务商与模型<select id="providerInput"></select></label>
+          <label>接口地址<input id="baseUrlInput" type="url" autocomplete="off" value="https://api.deepseek.com" /></label>
+          <label>模型名称<input id="modelInput" type="text" autocomplete="off" value="deepseek-flash" /></label>
+        </div>
+        <p class="provider-hint" id="providerHint"></p>
+      </details>
+
+      <section class="connect-step connect-test" aria-labelledby="testStepTitle">
+        <header><i>3</i><div><b id="testStepTitle">自动检测连接</b></div></header>
+        <div class="connection-checks" aria-live="polite"><span id="checkKey"><i></i>密钥已填写</span><span id="checkModel"><i></i>账户与模型可用</span><span id="checkDone"><i></i>完成连接</span></div>
+      </section>
+
+      <details class="privacy-note"><summary>安全与数据说明</summary><span>调用模型时，你输入的材料会发送给所选的模型服务商。敏感材料请先匿名化。</span></details>
+      <div class="dialog-actions">
+        <button class="button ghost" data-close-dialog>暂不连接</button>
+        <button class="button primary" id="connectButton">连接并检测</button>
+      </div>
+      <p class="dialog-status" id="dialogStatus" role="status"></p>
     </dialog>
+
     <div id="toast" role="status" aria-live="polite"></div>
+    <script src="./tools-data.js"></script>
+    <script src="./provider-data.js"></script>
+    <script src="./workflow-data.js"></script>
+    <script src="./theory-data.js"></script>
+    <script src="./engine-data.js"></script>
     <script src="./app.js"></script>
   </body>
 </html>
