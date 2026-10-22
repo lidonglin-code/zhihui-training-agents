@@ -2,8 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import http from "node:http";
 import vm from "node:vm";
-import {spawn} from "node:child_process";
-import {fileURLToPath} from "node:url";
+import {createAppServer} from "../server.mjs";
 
 const context = {window:{}};
 vm.createContext(context);
@@ -62,7 +61,7 @@ const mock = http.createServer(async (req,res) => {
   let raw = "";
   for await (const chunk of req) raw += chunk;
   const body = JSON.parse(raw || "{}");
-  assert.ok(["/v1/chat/completions", "/chat/completions"].includes(req.url), `非预期请求路径：${req.url}`);
+  assert.ok(req.url.endsWith("/chat/completions"), `非预期请求路径：${req.url}`);
   assert.equal(req.headers.authorization, "Bearer test-key");
   received.push({url:req.url,body});
   res.writeHead(200,{"Content-Type":"application/json"});
@@ -71,12 +70,14 @@ const mock = http.createServer(async (req,res) => {
 
 await new Promise(resolve => mock.listen(0,"127.0.0.1",resolve));
 const mockPort = mock.address().port;
-const appPort = 43000 + (process.pid % 1000);
-const app = spawn(process.execPath,[fileURLToPath(new URL("../server.mjs",import.meta.url))],{
-  cwd:fileURLToPath(new URL("..",import.meta.url)),
-  env:{...process.env,PORT:String(appPort)},
-  stdio:["ignore","pipe","pipe"]
-});
+// Inject a mock transport in this test process; the production server never accepts
+// local model URLs or an environment variable that disables address protection.
+const app = createAppServer({requestModel:async (url, options) => {
+  const original = new URL(url);
+  return fetch(`http://127.0.0.1:${mockPort}${original.pathname}`, options);
+}});
+await new Promise(resolve => app.listen(0, "127.0.0.1", resolve));
+const appPort = app.address().port;
 
 try {
   let ready = false;
@@ -109,14 +110,14 @@ try {
   for (const provider of quickProviders) {
     for (const tierId of tierIds) {
       const tier = provider.tiers[tierId];
-      const config = {provider:provider.id,baseUrl:`http://127.0.0.1:${mockPort}/v1`,model:tier.model,thinking:tier.thinking,reasoningEffort:tier.reasoningEffort,apiKey:"test-key"};
+      const config = {provider:provider.id,baseUrl:provider.url,model:tier.model,thinking:tier.thinking,reasoningEffort:tier.reasoningEffort,apiKey:"test-key"};
       const response = await fetch(`http://127.0.0.1:${appPort}/api/model/test`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({config})});
       const result = await response.json();
       assert.equal(response.status,200,result.error || `${provider.name} ${tierId}档连接测试失败`);
       assert.equal(result.content,"连接成功");
       const testRequest = received.at(-1).body;
       assert.equal(testRequest.model,tier.model,`${provider.name} ${tierId}档模型路由错误`);
-      assert.equal(testRequest.max_tokens,512);
+      assert.equal(provider.id === "openai" ? testRequest.max_completion_tokens : testRequest.max_tokens,512);
       assert.equal(testRequest.response_format,undefined);
       assertControls(provider,tier,true,testRequest);
 
@@ -126,7 +127,7 @@ try {
       assert.equal(chatResult.content,'{"ok":true}');
       const chatRequest = received.at(-1).body;
       assert.equal(chatRequest.model,tier.model,`${provider.name} ${tierId}档生成模型路由错误`);
-      assert.equal(chatRequest.max_tokens,2000);
+      assert.equal(provider.id === "openai" ? chatRequest.max_completion_tokens : chatRequest.max_tokens,2000);
       if (provider.id === "siliconflow") {
         assert.equal(chatRequest.response_format.type,"json_schema");
         assert.equal(chatRequest.response_format.json_schema.name,"test_result");
@@ -140,6 +141,7 @@ try {
   assert.equal(received.length,quickProviders.length * tierIds.length * 2,"模拟请求数量不完整");
   console.log(`六厂商模拟接入通过：共验证 ${received.length} 次请求，覆盖 18 组厂商与档位配置。`);
 } finally {
-  app.kill("SIGTERM");
+  app.closeAllConnections();
+  await new Promise(resolve => app.close(resolve));
   await new Promise(resolve => mock.close(resolve));
 }

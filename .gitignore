@@ -10,4 +10,11 @@ yarn-error.log*
 pnpm-debug.log*
 coverage/
 *.local
+*.bundle
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+*.log
+security-backups/
 

@@ -31,6 +31,7 @@
           <div class="top-actions">
             <button class="theme-toggle" type="button" data-theme-toggle aria-label="切换为浅色模式"></button>
             <span class="connection-state" id="connectionState"><i></i>未连接模型</span>
+            <button class="button ghost" id="clearDataButton" type="button">清除数据</button>
             <button class="button secondary" id="modelButton">连接我的大模型</button>
           </div>
         </header>
@@ -75,6 +76,9 @@
         <p class="provider-hint" id="providerHint"></p>
       </details>
 
+      <div class="endpoint-preview"><span>材料与密钥发送至</span><b id="endpointHost">api.deepseek.com</b></div>
+      <label class="custom-endpoint-consent" id="customEndpointConsent" hidden><input id="trustEndpoint" type="checkbox"><span>我确认信任此自定义服务，允许向其发送密钥与材料。</span></label>
+
       <section class="connect-step connect-test" aria-labelledby="testStepTitle">
         <header><i>3</i><div><b id="testStepTitle">自动检测连接</b></div></header>
         <div class="connection-checks" aria-live="polite"><span id="checkKey"><i></i>密钥已填写</span><span id="checkModel"><i></i>账户与模型可用</span><span id="checkDone"><i></i>完成连接</span></div>
@@ -86,6 +90,15 @@
         <button class="button primary" id="connectButton">连接并检测</button>
       </div>
       <p class="dialog-status" id="dialogStatus" role="status"></p>
+    </dialog>
+
+    <dialog id="clearDataDialog" class="model-dialog clear-data-dialog" aria-labelledby="clearDataTitle">
+      <button class="dialog-close" id="cancelClearClose" type="button" aria-label="关闭清除数据窗口">×</button>
+      <h2 id="clearDataTitle">清除本机工作记录？</h2>
+      <p>将清除当前浏览器中八位智能体的输入、生成成果、上传材料与模型连接，并停止本页正在进行的任务。已导出的文件和模型服务商保存的记录不受影响。</p>
+      <p>需要的成果请先导出。显示主题会保留。</p>
+      <p id="clearDataStatus" role="status"></p>
+      <div class="dialog-actions"><button class="button ghost" id="cancelClearData" type="button">保留记录</button><button class="button primary" id="confirmClearData" type="button">确认清除</button></div>
     </dialog>
 
     <div id="toast" role="status" aria-live="polite"></div>

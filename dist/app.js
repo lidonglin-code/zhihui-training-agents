@@ -78,6 +78,30 @@ function persist() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(safe)); } catch {}
 }
 
+const clearDataDialog = document.querySelector("#clearDataDialog");
+document.querySelector("#clearDataButton").addEventListener("click", () => clearDataDialog.showModal());
+for (const id of ["cancelClearClose", "cancelClearData"]) document.querySelector(`#${id}`).addEventListener("click", () => clearDataDialog.close());
+document.querySelector("#confirmClearData").addEventListener("click", () => {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+    // Remove only this app's previous draft keys, never other apps on this origin.
+    for (const key of Object.keys(localStorage)) if (/^xinjing-prompt-tools-/.test(key)) localStorage.removeItem(key);
+  } catch {
+    document.querySelector("#clearDataStatus").textContent = "浏览器未允许删除本地数据，请在浏览器设置中清除此站点的数据。";
+    return;
+  }
+  activeRequest?.abort();
+  modelConfig = null;
+  pendingGeneration = null;
+  document.querySelector("#apiKeyInput").value = "";
+  // Reload also destroys in-memory attachments, keys and late async callbacks.
+  location.reload();
+});
+// Apply a clear action in other open workbench tabs before drafts can be restored.
+window.addEventListener("storage", event => {
+  if ((event.key === STORAGE_KEY && event.newValue === null) || event.key === null) location.reload();
+});
+
 function productById(id) { return products.find(product => product.id === id); }
 
 function navigate(id) {
@@ -718,6 +742,9 @@ const tierSelect = document.querySelector("#tierSelect");
 const modelRoute = document.querySelector("#modelRoute");
 const modelRouteTitle = document.querySelector("#modelRouteTitle");
 const modelRouteDetail = document.querySelector("#modelRouteDetail");
+const endpointHost = document.querySelector("#endpointHost");
+const customEndpointConsent = document.querySelector("#customEndpointConsent");
+const trustEndpoint = document.querySelector("#trustEndpoint");
 const providerById = id => providers.find(provider => provider.id === id) || providers[0];
 const quickProviderIds = new Set(["deepseek", "siliconflow", "zhipu", "qwen", "kimi", "openai"]);
 const providerGroup = id => id.startsWith("siliconflow") ? "siliconflow" : quickProviderIds.has(id) ? id : "advanced";
@@ -760,11 +787,38 @@ function setCheck(element,state="") {
 }
 
 function resetConnectionFeedback(message="") {
+  trustEndpoint.checked = false;
+  renderEndpointDestination();
   setCheck(checkKey, apiKeyInput.value.trim() ? "ready" : "");
   setCheck(checkModel);
   setCheck(checkDone);
   dialogStatus.className = "dialog-status";
   dialogStatus.textContent = message;
+}
+
+function modelEndpointDestination() {
+  let url;
+  try { url = new URL(baseUrlInput.value.trim()); } catch { throw new Error("请输入有效的 HTTPS 模型接口地址"); }
+  if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash || (url.port && url.port !== "443")) {
+    throw new Error("请使用 HTTPS 标准端口的接口地址，不要包含账号、密码或查询参数");
+  }
+  const host = url.hostname.toLowerCase();
+  if (!host.includes(".") || host.endsWith(".") || /(^|\.)(localhost|local|internal|lan|home|test|invalid|onion)$/.test(host) || /^\d+\.\d+\.\d+\.\d+$/.test(host) || host.includes(":")) {
+    throw new Error("请填写模型服务商的公网域名，不能使用本机或局域网地址");
+  }
+  const official = providers.some(provider => provider.id !== "custom" && provider.url && new URL(provider.url).hostname === host);
+  return {host, official};
+}
+
+function renderEndpointDestination() {
+  try {
+    const destination = modelEndpointDestination();
+    endpointHost.textContent = destination.host;
+    customEndpointConsent.hidden = destination.official;
+  } catch {
+    endpointHost.textContent = "请填写有效的公网 HTTPS 接口";
+    customEndpointConsent.hidden = true;
+  }
 }
 
 function renderKeyGuide() {
@@ -808,6 +862,7 @@ function applyProvider(id, options = {}) {
   syncProviderControl(id);
   syncTierControl();
   renderModelRoute();
+  renderEndpointDestination();
 }
 
 providerInput.innerHTML = providers.map(provider => `<option value="${escapeHtml(provider.id)}">${escapeHtml(provider.name)}</option>`).join("");
@@ -908,6 +963,18 @@ connectButton.addEventListener("click", async () => {
   if (!config.baseUrl || !config.model) {
     advancedSettings.open = true;
     dialogStatus.textContent = "当前接口或模型名称为空，请在高级设置中补充。";
+    return;
+  }
+  try {
+    const destination = modelEndpointDestination();
+    if (!destination.official && !trustEndpoint.checked) {
+      dialogStatus.textContent = `请先确认信任 ${destination.host}，再连接此自定义服务。`;
+      trustEndpoint.focus();
+      return;
+    }
+  } catch (error) {
+    dialogStatus.textContent = error.message;
+    advancedSettings.open = true;
     return;
   }
   connectButton.disabled = true;

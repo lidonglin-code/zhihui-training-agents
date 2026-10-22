@@ -1,13 +1,13 @@
 import http from "node:http";
-import { readFile, stat } from "node:fs/promises";
+import { readFile, stat, realpath } from "node:fs/promises";
 import { basename, extname, join, normalize } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { guardLocalRequest, redactProviderError, secureModelRequest, validateModelUrl } from "./server-security.mjs";
 import { unzipSync, strFromU8 } from "fflate";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 
 const projectRoot = fileURLToPath(new URL("./", import.meta.url));
 const root = join(projectRoot, "dist");
-const prdRoot = join(projectRoot, "..", "PRD");
 const port = Number(process.env.PORT || 4173);
 const maxFileBytes = 8 * 1024 * 1024;
 const maxExtractedChars = 180_000;
@@ -19,6 +19,7 @@ function json(res, status, payload) {
 }
 
 async function readJson(req) {
+  if (!/^application\/json(?:;|$)/i.test(req.headers["content-type"] || "")) throw new Error("请求必须使用 application/json");
   let body = "";
   for await (const chunk of req) {
     body += chunk;
@@ -36,7 +37,11 @@ function decodeXml(value) {
 }
 
 function extractDocx(buffer) {
-  const files = unzipSync(new Uint8Array(buffer));
+  const files = unzipSync(new Uint8Array(buffer), {filter:file => {
+    if (file.name !== "word/document.xml") return false;
+    if (file.originalSize > 16 * 1024 * 1024) throw new Error("Word 解压后的正文过大");
+    return true;
+  }});
   const documentXml = files["word/document.xml"];
   if (!documentXml) throw new Error("无法读取这个 Word 文件的正文");
   const xml = strFromU8(documentXml);
@@ -111,8 +116,10 @@ function safeResponseSchema(value) {
   return JSON.stringify(value).length <= 60_000 ? value : null;
 }
 
-async function callModel(config, messages, maxTokens = 6000, options = {}) {
+async function callModel(config, messages, maxTokens = 6000, options = {}, requestModel = secureModelRequest) {
   if (!config?.baseUrl || !config?.model || !config?.apiKey) throw new Error("模型配置不完整");
+  validateModelUrl(config.baseUrl);
+  const modelUrl = validateModelUrl(endpoint(config.baseUrl));
   const controller = new AbortController();
   const providerHost = new URL(config.baseUrl).hostname;
   const providerId = String(config.provider || "");
@@ -146,48 +153,57 @@ async function callModel(config, messages, maxTokens = 6000, options = {}) {
   }
   let response;
   try {
-    response = await fetch(endpoint(config.baseUrl), {
+    response = await requestModel(modelUrl.toString(), {
       method:"POST",
       headers:{"Content-Type":"application/json","Authorization":`Bearer ${config.apiKey}`},
       body:JSON.stringify({model:config.model,messages,...tokenField,...formatField,...thinkingField}),
       signal:controller.signal
     });
+    const raw = await response.text();
+    let data;
+    try { data = JSON.parse(raw); } catch { data = null; }
+    if (!response.ok) throw new Error(redactProviderError(data?.error?.message || data?.message || `模型服务返回 ${response.status}`, config.apiKey));
+    const choice = data?.choices?.[0];
+    const content = modelMessageText(choice?.message);
+    if (!content && options.allowReasoning && choice?.message?.reasoning_content) return "模型已成功响应";
+    if (!content && choice?.finish_reason === "length") throw new Error("模型已响应，但输出在形成正文前达到 Token 上限");
+    if (!content) throw new Error("模型服务没有返回可读取正文");
+    return content;
   } catch (error) {
     if (error?.name === "AbortError") throw new Error("模型响应超时，请稍后重试或减少输入材料");
-    throw error;
+    throw new Error(redactProviderError(error?.message, config.apiKey));
   } finally { clearTimeout(timeout); }
-  const raw = await response.text();
-  let data;
-  try { data = JSON.parse(raw); } catch { data = null; }
-  if (!response.ok) throw new Error(data?.error?.message || data?.message || `模型服务返回 ${response.status}`);
-  const choice = data?.choices?.[0];
-  const content = modelMessageText(choice?.message);
-  if (!content && options.allowReasoning && choice?.message?.reasoning_content) return "模型已成功响应";
-  if (!content && choice?.finish_reason === "length") throw new Error("模型已响应，但输出在形成正文前达到 Token 上限");
-  if (!content) throw new Error("模型服务没有返回可读取正文");
-  return content;
 }
 
 async function serveFile(req, res) {
   const requestUrl = new URL(req.url, `http://${req.headers.host || "127.0.0.1"}`);
   let pathname = decodeURIComponent(requestUrl.pathname);
   if (pathname === "/") pathname = "/index.html";
-  const isPrd = pathname.startsWith("/PRD/");
-  const base = isPrd ? prdRoot : root;
-  const relative = normalize(isPrd ? pathname.slice(5) : pathname).replace(/^([/\\])+/, "");
+  const base = root;
+  const relative = normalize(pathname).replace(/^([/\\])+/, "");
+  if (relative.split(/[/\\]/).some(part => part.startsWith("."))) return json(res, 403, {error:"禁止访问"});
   const file = join(base, relative);
   if (file !== base && !file.startsWith(`${base}/`)) return json(res, 403, {error:"禁止访问"});
   try {
     const info = await stat(file);
     const target = info.isDirectory() ? join(file, "index.html") : file;
-    const content = await readFile(target);
+    const actual = await realpath(target);
+    if (!actual.startsWith(`${await realpath(base)}/`)) return json(res, 403, {error:"禁止访问"});
+    const content = await readFile(actual);
     res.writeHead(200, {"Content-Type":mime[extname(target)] || "application/octet-stream","Cache-Control":"no-cache"});
     res.end(content);
   } catch { json(res, 404, {error:"未找到页面"}); }
 }
 
-const server = http.createServer(async (req, res) => {
+export function createAppServer({requestModel = secureModelRequest} = {}) {
+return http.createServer(async (req, res) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Referrer-Policy", "no-referrer");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'");
   try {
+    const denied = guardLocalRequest(req);
+    if (denied) return json(res, 403, {error:denied});
     if (req.method === "POST" && req.url === "/api/files/extract") {
       const payload = await readJson(req);
       const extracted = await extractFile(payload);
@@ -195,23 +211,24 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === "POST" && req.url === "/api/model/test") {
       const {config} = await readJson(req);
-      const content = await callModel(config, [{role:"user",content:"只回复：连接成功"}], 512, {allowReasoning:true,isTest:true});
+      const content = await callModel(config, [{role:"user",content:"只回复：连接成功"}], 512, {allowReasoning:true,isTest:true}, requestModel);
       return json(res, 200, {ok:true,content});
     }
     if (req.method === "POST" && req.url === "/api/model/chat") {
       const {config,messages,maxTokens,responseSchema} = await readJson(req);
       if (!Array.isArray(messages) || !messages.length) return json(res, 400, {error:"缺少分析内容"});
       const safeMaxTokens = Math.max(1000, Math.min(8000, Number(maxTokens) || 6000));
-      const content = await callModel(config, messages, safeMaxTokens, {jsonMode:true,responseSchema});
+      const content = await callModel(config, messages, safeMaxTokens, {jsonMode:true,responseSchema}, requestModel);
       return json(res, 200, {ok:true,content});
     }
     if (req.method === "GET" || req.method === "HEAD") return serveFile(req, res);
     json(res, 405, {error:"不支持的请求"});
   } catch (error) {
-    json(res, 502, {error:error instanceof Error ? error.message : "本地服务错误"});
+    json(res, 502, {error:error instanceof Error ? redactProviderError(error.message) : "本地服务错误"});
   }
 });
+}
 
-server.listen(port, "127.0.0.1", () => {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) createAppServer().listen(port, "127.0.0.1", () => {
   console.log(`新境企业培训 AI 工具已启动：http://127.0.0.1:${port}`);
 });
