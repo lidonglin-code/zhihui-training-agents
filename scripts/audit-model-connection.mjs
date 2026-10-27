@@ -131,6 +131,8 @@ try {
       if (provider.id === "siliconflow") {
         assert.equal(chatRequest.response_format.type,"json_schema");
         assert.equal(chatRequest.response_format.json_schema.name,"test_result");
+      } else if (["deepseek","qwen"].includes(provider.id)) {
+        assert.equal(chatRequest.response_format.type,"json_object");
       } else {
         assert.equal(chatRequest.response_format,undefined);
       }
@@ -139,7 +141,31 @@ try {
     console.log(`✓ ${provider.name}：经济、均衡、高质量三档连接与生成请求通过`);
   }
   assert.equal(received.length,quickProviders.length * tierIds.length * 2,"模拟请求数量不完整");
-  console.log(`六厂商模拟接入通过：共验证 ${received.length} 次请求，覆盖 18 组厂商与档位配置。`);
+  for (const provider of quickProviders) for (const tierId of tierIds) for (const phase of ["section","repair"]) {
+    const tier=provider.tiers[tierId];
+    const config={provider:provider.id,baseUrl:provider.url,model:tier.model,thinking:tier.thinking,reasoningEffort:tier.reasoningEffort,apiKey:"test-key"};
+    const response=await fetch(`http://127.0.0.1:${appPort}/api/model/chat`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({config,phase,messages:[{role:"user",content:"生成 JSON"}],responseSchema:schema})});
+    const result=await response.json();
+    assert.equal(response.status,200,result.error);
+    const request=received.at(-1).body;
+    assert.equal(request.model,tier.model,"阶段处理不得擅自换模型");
+    const tokens=provider.id==="openai" ? request.max_completion_tokens : request.max_tokens;
+    assert.ok(tokens>=6144 && tokens<=32768,"阶段预算应与任务匹配并受上限约束");
+    if (provider.id==="deepseek") {
+      assert.equal(request.thinking.type,phase==="repair" ? "disabled" : tier.thinking);
+      if (request.thinking.type==="enabled") assert.equal(request.reasoning_effort,"low");
+      assert.equal(request.response_format.type,"json_object");
+    } else if (provider.id==="siliconflow") {
+      assert.equal(request.enable_thinking,phase==="repair" ? false : tier.thinking==="enabled");
+      assert.equal(request.response_format.type,"json_schema");
+    } else if (provider.id==="qwen") {
+      assert.equal(request.reasoning_effort,phase==="repair" || tier.thinking==="disabled" ? "none" : "low");
+      assert.equal(request.response_format.type,"json_object");
+    } else if (provider.id==="kimi" || provider.id==="openai") assert.equal(request.reasoning_effort,"low");
+    else if (provider.id==="zhipu" && request.thinking.type==="enabled") assert.equal(request.reasoning_effort,"low");
+  }
+  assert.equal(received.length,72);
+  console.log(`六厂商模拟接入通过：共验证 ${received.length} 次请求，覆盖 18 组配置及章节生成、格式修复策略。`);
 } finally {
   app.closeAllConnections();
   await new Promise(resolve => app.close(resolve));

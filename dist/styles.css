@@ -179,19 +179,18 @@
   .generating-shell{height:100%;min-height:0;padding:24px}
 }
 
-/* Generated成果 can be longer than one viewport. In result mode the document
-   returns to normal page scrolling; the compact one-screen rule remains only
-   for the home, input and generating views. */
+/* Keep navigation and recovery actions visible; long results scroll inside the
+   reading pane. Mobile retains its natural vertical document flow. */
 @media(min-width:1181px){
   html.result-page-active,
-  html.result-page-active body{height:auto;min-height:100%;overflow-x:hidden;overflow-y:auto}
-  html.result-page-active .app{height:auto;min-height:100vh;overflow:visible}
-  html.result-page-active .main{height:auto;min-height:100vh;overflow:visible}
-  html.result-page-active .page{height:auto;min-height:calc(100vh - 54px);overflow:visible}
-  html.result-page-active .result-shell{height:auto;min-height:0}
-  html.result-page-active .result-layout{align-items:start}
-  html.result-page-active .result-document{overflow:visible;padding-right:0}
-  html.result-page-active .result-side{position:sticky;top:66px;max-height:none;overflow:visible}
+  html.result-page-active body{height:100%;min-height:0;overflow:hidden}
+  html.result-page-active .app{height:100dvh;min-height:0;overflow:hidden}
+  html.result-page-active .main{height:100dvh;min-height:0;overflow:hidden}
+  html.result-page-active .page{height:calc(100dvh - 54px);min-height:0;overflow:hidden}
+  html.result-page-active .result-shell{height:100%;min-height:0}
+  html.result-page-active .result-layout{flex:1;min-height:0;align-items:stretch}
+  html.result-page-active .result-document{min-height:0;overflow:auto;padding-right:4px;grid-auto-rows:max-content;align-content:start}
+  html.result-page-active .result-side{position:static;min-height:0;max-height:100%;overflow:auto;align-content:start}
 }
 
 /* Ordered home introduction: one headline block and one compact capability block. */
@@ -868,6 +867,22 @@ body::before{
 .model-dialog .dialog-status{min-height:15px;margin-top:4px!important;font-size:.7rem!important}
 .model-dialog .dialog-status.success{color:var(--success)!important}
 .model-dialog .dialog-status.info{color:#b8afd6!important}
+.recovery-banner{align-items:center;border-color:#424b60;background:#1a2130}
+.recovery-banner b{color:#d6cce7}
+.recovery-banner span,.recovery-banner button{color:#d5d8e1}
+.generation-brief>.recovery-banner{grid-template-columns:1fr;gap:6px;margin:5px 0 0;padding:9px 10px}
+.generation-brief>.recovery-banner b{font-size:.73rem}
+.generation-brief>.recovery-banner span{font-size:.7rem;line-height:1.5}
+.recovery-banner>div{display:flex;align-items:center;gap:8px}
+.recovery-banner>div .button{white-space:nowrap;padding:8px 12px;font-size:.76rem}
+.recovery-banner [data-resume-generation]{background:var(--agent-accent);color:#fff}
+.generation-brief .recovery-banner .button[data-resume-generation]{background:var(--agent-accent);color:#fff}
+[data-theme="light"] .recovery-banner{border-color:#d3cbc2;background:#ede8e1}
+[data-theme="light"] .recovery-banner b{color:#665878}
+[data-theme="light"] .recovery-banner span,[data-theme="light"] .recovery-banner button{color:#535563}
+[data-theme="light"] .recovery-banner [data-resume-generation]{color:#fff}
+.generation-retained{display:block;margin:8px 0;color:var(--ink-2);font-size:.84rem}
+@media(max-width:620px){.recovery-banner>div{grid-column:1/-1;justify-content:flex-end}}
 .endpoint-preview{display:flex;align-items:baseline;flex-wrap:wrap;gap:5px 10px;padding:5px 0;color:var(--muted);font-size:.72rem}
 .endpoint-preview b{color:var(--ink);overflow-wrap:anywhere}
 .custom-endpoint-consent{display:flex;align-items:flex-start;gap:8px;margin:4px 0 8px;color:var(--ink-2);font-size:.76rem;line-height:1.5}

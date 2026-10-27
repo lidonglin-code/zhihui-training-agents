@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
-    "test": "node scripts/audit-methods.mjs && node scripts/audit-model-connection.mjs && node scripts/audit-security.mjs"
+    "test": "node scripts/audit-methods.mjs && node scripts/audit-model-connection.mjs && node scripts/audit-security.mjs && node scripts/audit-generation.mjs"
   },
   "dependencies": {
     "fflate": "^0.8.3",

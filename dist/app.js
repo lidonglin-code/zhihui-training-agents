@@ -1,3 +1,5 @@
+import {runGeneration, parseModelJson, friendlyGenerationError, GENERATION_VERSION} from "./generation-core.js";
+
 const products = window.PRODUCTS;
 const providers = window.MODEL_PROVIDERS;
 const modelTiers = window.MODEL_TIERS;
@@ -63,19 +65,24 @@ const stored = loadStored();
 const sessions = Object.fromEntries(products.map(product => [product.id, {
   values:{...defaultValues(product.id), ...(stored[product.id]?.values || {})},
   result:stored[product.id]?.result || null,
-  attachments:[],
+  attachments:stored[product.id]?.checkpoint || stored[product.id]?.result ? (stored[product.id].attachments || []).filter(file=>file.status === "已读取" && typeof file.text === "string") : [],
+  checkpoint:stored[product.id]?.checkpoint || null,
+  progress:null,
   view:stored[product.id]?.result ? "result" : "input",
   generating:false,
-  error:"",
+  error:stored[product.id]?.checkpoint ? "有未完成的任务，已保留进度，可以继续生成。" : "",
   refine:""
 }]));
 
 function persist() {
   const safe = Object.fromEntries(products.map(product => [product.id, {
     values:sessions[product.id].values,
-    result:sessions[product.id].result
+    result:sessions[product.id].result,
+    checkpoint:sessions[product.id].checkpoint,
+    attachments:sessions[product.id].checkpoint || sessions[product.id].result ? sessions[product.id].attachments.filter(file=>file.status === "已读取").map(({id,name,text,characters,truncated,status})=>({id,name,text,characters,truncated,status})) : []
   }]));
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(safe)); } catch {}
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(safe)); }
+  catch { showToast("浏览器存储空间不足，本页仍保留进度；请保持页面打开并及时导出成果。"); }
 }
 
 const clearDataDialog = document.querySelector("#clearDataDialog");
@@ -208,7 +215,6 @@ function renderInput(product) {
       <div class="tool-avatar"><img src="${product.image}" alt="${product.name}人物形象"></div>
       <div><span class="kicker">${product.number} · ${product.category}</span><h1>${product.name}</h1><p>${spec.intro}</p></div>
     </header>
-    ${session.error ? `<div class="error-banner"><b>没有生成成功</b><span>${escapeHtml(session.error)}</span><button data-dismiss-error>关闭</button></div>` : ""}
     <form class="generator-form" id="generatorForm">
       <section class="form-main"><div class="form-heading"><span>提供必要信息</span><p>可以直接填写，也可以上传材料。不确定的内容可以留空，AI 会标记待确认。</p></div>${renderUpload(product,session)}${spec.fields.map(field => renderField(field, session.values[field.id], field.id === unpairedFieldId ? "field-unpaired" : "")).join("")}</section>
       <aside class="generation-brief">
@@ -219,12 +225,19 @@ function renderInput(product) {
         </section>
         <span class="brief-section-label">你将得到</span>
         <ol>${spec.sections.map((section,index)=>`<li><i>${String(index+1).padStart(2,"0")}</i><b>${section}</b></li>`).join("")}</ol>
-        <div class="generation-boundary"><b>生成原则</b><p>基于你的材料 · 不编造企业事实 · 信息不足明确标记 · 输出可直接修改</p></div>
+        ${session.error ? renderRecovery(product) : `<div class="generation-boundary"><b>生成原则</b><p>基于你的材料 · 不编造企业事实 · 信息不足明确标记 · 输出可直接修改</p></div>`}
         <div class="form-actions"><button class="button ghost" type="button" data-fill-sample>填入示例</button><button class="button primary generate-button" type="submit">生成${product.outcome.split("、")[0]}</button></div>
       </aside>
     </form>
     ${renderTheoryGuide(product)}
   </section>`;
+}
+
+function renderRecovery(product) {
+  const session=sessions[product.id];
+  if (!session.error) return "";
+  const count=specs[product.id].sections.filter((_,i)=>session.checkpoint?.parts?.[`section:${i}`]).length;
+  return `<div class="error-banner recovery-banner"><b>${session.checkpoint ? "进度已保留" : "本次尚未完成"}</b><span>${escapeHtml(session.error || "可以从已完成部分继续。")}${count ? ` 已完成 ${count} 个章节。` : ""}</span><div>${session.checkpoint ? `<button type="button" class="button secondary" data-resume-generation>继续生成</button>` : ""}<button type="button" data-dismiss-error>关闭提示</button></div></div>`;
 }
 
 function resultToText(product, result) {
@@ -293,8 +306,8 @@ function renderResult(product) {
   const session = sessions[product.id];
   const result = session.result;
   return `<section class="result-shell accent-${product.accent}" style="--agent-accent:var(--${product.accent})">
-    <header class="result-toolbar"><div><span class="kicker">${product.name} · 已生成</span><h1>${escapeHtml(result.title)}</h1></div><div><button class="button ghost" data-back-input>修改输入</button><button class="button secondary" data-regenerate>重新生成</button><button class="button secondary" data-copy-result>复制全文</button><button class="button primary" data-export-result>导出成果</button></div></header>
-    ${session.error ? `<div class="error-banner"><b>修改没有完成</b><span>${escapeHtml(session.error)}</span><button data-dismiss-error>关闭</button></div>` : ""}
+    <header class="result-toolbar"><div><span class="kicker">${product.name} · ${session.checkpoint ? "上一版成果（新任务尚未完成）" : "已生成"}</span><h1>${escapeHtml(result.title)}</h1></div><div><button class="button ghost" data-back-input>修改输入</button><button class="button secondary" data-regenerate>重新生成</button><button class="button secondary" data-copy-result>复制全文</button><button class="button primary" data-export-result>导出成果</button></div></header>
+    ${renderRecovery(product)}
     <div class="result-layout">
       <main class="result-document">
         <section class="result-summary"><span>成果摘要</span><div class="editable-text" contenteditable="true" data-summary>${escapeHtml(result.summary)}</div></section>
@@ -311,8 +324,10 @@ function renderResult(product) {
 }
 
 function renderGenerating(product) {
-  const spec = specs[product.id];
-  return `<section class="generating-shell accent-${product.accent}" style="--agent-accent:var(--${product.accent})"><img src="${product.image}" alt=""><span>正在由 ${product.name} 处理</span><h1>材料已经收到，正在形成专业成果</h1><p>${spec.prompt.split("。")[0]}。</p><div class="generation-steps"><b class="active">读取用户材料</b><b>应用内置方法</b><b>组织交付成果</b><b>检查事实与边界</b></div><div class="loading-bar"><i></i></div><button class="button ghost" data-cancel-generation>停止生成</button></section>`;
+  const session=sessions[product.id];
+  const progress=session.progress || {};
+  const step=progress.phase === "source" ? 0 : progress.phase === "plan" ? 1 : progress.phase === "review" ? 3 : 2;
+  return `<section class="generating-shell accent-${product.accent}" style="--agent-accent:var(--${product.accent})"><img src="${product.image}" alt=""><span>正在由 ${product.name} 处理</span><h1 role="status">${escapeHtml(progress.title || "正在准备生成任务")}</h1><p>${escapeHtml(progress.detail || "系统会保留完成的内容，中断后可以继续。")}</p><div class="generation-steps">${["整理材料依据","确定目标与结构","分段组织成果","核对事实与边界"].map((label,index)=>`<b class="${index===step ? "active" : ""}">${label}</b>`).join("")}</div><small class="generation-retained">${progress.completed ? `已完成 ${progress.completed} / ${progress.total} 个章节` : "正在处理当前部分"}</small><div class="loading-bar"><i></i></div><button class="button ghost" data-cancel-generation>暂停并保留进度</button></section>`;
 }
 
 function renderTool(product) {
@@ -354,10 +369,8 @@ function buildMessages(product, values, refineInstruction = "") {
   const theory = theories[product.id];
   const engine = engines[product.id];
   const input = spec.fields.map(field => `${field.label}：${values[field.id] || "未提供"}`).join("\n\n");
-  let remaining = 220_000;
   const attachmentText = sessions[product.id].attachments.filter(file=>file.status === "已读取").map(file => {
-    const text = file.text.slice(0,Math.max(0,remaining));
-    remaining -= text.length;
+    const text = file.text;
     return text ? `【上传文件：${file.name}】\n${text}` : "";
   }).filter(Boolean).join("\n\n");
   const schema = {
@@ -481,10 +494,7 @@ function requireUsefulText(value, label, minLength) {
 }
 
 function parseModelResult(raw, spec, engine) {
-  const cleaned = String(raw).replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
-  const start = cleaned.indexOf("{");
-  const end = cleaned.lastIndexOf("}");
-  const parsed = JSON.parse(start >= 0 && end > start ? cleaned.slice(start,end+1) : cleaned);
+  const parsed = parseModelJson(raw);
   if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.sections)) throw new Error("模型结果缺少成果结构");
   if (parsed.sections.length !== spec.sections.length) throw new Error(`成果章节应为 ${spec.sections.length} 个，实际为 ${parsed.sections.length} 个`);
   const sections = spec.sections.map((heading,index) => {
@@ -522,15 +532,21 @@ for (const product of products) {
 }
 if (discardedStoredResults) persist();
 
-async function callModel(messages, signal, maxTokens = 6000, responseSchema = null) {
-  const response = await fetch("/api/model/chat", {method:"POST",headers:{"Content-Type":"application/json"},signal,body:JSON.stringify({config:modelConfig,messages,maxTokens,responseSchema})});
-  const result = await response.json();
-  if (!response.ok) throw new Error(result.error || "模型调用失败");
-  return result.content;
+async function callModel(config, {messages,signal,maxTokens,responseSchema,phase}) {
+  let response;
+  try { response = await fetch("/api/model/chat", {method:"POST",headers:{"Content-Type":"application/json"},signal,body:JSON.stringify({config,messages,maxTokens,responseSchema,phase})}); }
+  catch (error) {
+    if (error.name === "AbortError") throw error;
+    throw Object.assign(new Error("连接模型服务失败"),{code:"NETWORK",retryable:true});
+  }
+  const result = await response.json().catch(()=>({error:"本地服务响应无法读取",code:"NETWORK",retryable:true}));
+  if (!response.ok || result.error) throw Object.assign(new Error(result.error || "模型调用失败"),{code:result.code || "NETWORK",retryable:result.retryable ?? response.status >= 500});
+  return result;
 }
 
 async function generate(product, refineInstruction = "") {
   const session = sessions[product.id];
+  if (activeRequest) { showToast("另一个任务正在生成，请先等待完成或暂停它。"); return; }
   if (!modelConfig) {
     pendingGeneration = {id:product.id, refineInstruction};
     modelDialog.showModal();
@@ -539,45 +555,39 @@ async function generate(product, refineInstruction = "") {
   }
   session.generating = true;
   session.error = "";
+  session.progress = null;
   renderTool(product);
   const controller = new AbortController();
   activeRequest = controller;
   try {
-    const messages = buildMessages(product, session.values, refineInstruction);
-    const responseSchema = resultResponseSchema(specs[product.id], engines[product.id]);
-    let raw = await callModel(messages, controller.signal, 6000, responseSchema);
-    let parsed;
-    try { parsed = parseModelResult(raw, specs[product.id], engines[product.id]); }
-    catch (validationError) {
-      const retry = [...messages,{role:"assistant",content:raw},{role:"user",content:`上一版未通过成果验收：${validationError.message}。请回到原始材料和系统方法，重新生成一份完整成果。不得解释 JSON 协议，不得引用“上一章”代替正文，不得留下占位词；每个规定章节都必须包含可以直接继续工作的实际内容。只返回符合既定结构的完整 JSON。`}];
-      raw = await callModel(retry, controller.signal, 6000, responseSchema);
-      try { parsed = parseModelResult(raw, specs[product.id], engines[product.id]); }
-      catch (retryError) { throw new Error(`模型连续两次未生成完整成果：${retryError.message}`); }
-    }
-    const reviewMessages = [...messages,
-      {role:"assistant",content:JSON.stringify(parsed)},
-      {role:"user",content:`请作为严格的交付审稿人，对照原始输入与系统方法审查上面的候选成果，并直接返回修订后的完整成果。必须完成：
-1. 删除或改写任何没有来自原始输入的企业事实、既有制度、人员承诺和已验证效果。
-2. 用户未提供的角色、数量、频次、目标值、工具和责任安排，必须明确标为“建议”与“待确认”，不能伪装成已确定事实。
-3. 检查所有章节中的模型名称、术语、数字、周期和职责是否前后一致；发现矛盾必须统一。
-4. qualityChecks 只能依据原始材料和最终成果判断；证据不足时必须为“待确认”或“有风险”，不得自我表扬或笼统写“无虚构”。
-5. 删除内部协议、JSON、校验和审稿过程说明。
-6. 检查每章排版：统一使用轻量 Markdown。小标题写成“### 小标题”，步骤写成“1. 内容”，要点写成“- 内容”，字段写成“**字段名：** 内容”。每项独占一行，内容组之间留空行；阶段、组织、材料、讲师动作、学员动作以及脚本字段必须逐项分开；禁止用 | 或 ｜ 把多个字段挤在一行。保留全部规定章节，只返回符合既定结构的最终 JSON。`}];
-    const reviewedRaw = await callModel(reviewMessages, controller.signal, 6000, responseSchema);
-    try { parsed = parseModelResult(reviewedRaw, specs[product.id], engines[product.id]); }
-    catch (reviewError) { throw new Error(`成果审稿未通过：${reviewError.message}`); }
+    const config = {...modelConfig};
+    const messages = buildMessages(product,session.values,refineInstruction);
+    const hash = await crypto.subtle.digest("SHA-256",new TextEncoder().encode(JSON.stringify({version:GENERATION_VERSION,messages})));
+    const signature = [...new Uint8Array(hash)].map(byte=>byte.toString(16).padStart(2,"0")).join("");
+    const spec=specs[product.id], engine=engines[product.id];
+    const parsed=await runGeneration({id:product.id,spec,engine,values:session.values,config,baseMessages:messages,signature,checkpoint:session.checkpoint,signal:controller.signal,
+      resultSchema:resultResponseSchema(spec,engine),
+      validateResult:value=>parseModelResult(JSON.stringify(value),spec,engine),
+      validateSection:(value,heading)=>{
+        if (value?.heading !== heading) throw new Error(`章节标题必须是“${heading}”`);
+        return {heading,content:requireUsefulText(value.content,`“${heading}”章节`,30)};
+      },
+      request:options=>callModel(config,options),
+      onCheckpoint:value=>{ session.checkpoint={...value,refineInstruction}; persist(); },
+      onProgress:value=>{ session.progress=value; if (activeId===product.id) renderTool(product); }
+    });
     session.result = parsed;
     session.view = "result";
     session.refine = "";
+    session.checkpoint = null;
     persist();
     showToast(refineInstruction ? "成果已按要求更新" : "专业成果已生成");
   } catch (error) {
-    if (error.name === "AbortError") session.error = "本次生成已停止，你的输入仍然保留。";
-    else session.error = error.message || "模型调用失败，请检查连接后重试。";
+    session.error = friendlyGenerationError(error);
   } finally {
     session.generating = false;
-    activeRequest = null;
-    renderTool(product);
+    if (activeRequest === controller) activeRequest = null;
+    if (activeId === product.id) renderTool(product);
   }
 }
 
@@ -606,6 +616,8 @@ async function handleFiles(product, selectedFiles) {
   const session = sessions[product.id];
   const files = [...selectedFiles];
   if (!files.length) return;
+  session.checkpoint = null;
+  session.error = "";
   const room = Math.max(0, 8 - session.attachments.length);
   if (!room) { showToast("每个任务最多上传 8 个文件"); return; }
   const accepted = files.slice(0,room);
@@ -648,7 +660,10 @@ function bindTool(product) {
   dropZone?.addEventListener("dragleave", () => dropZone.classList.remove("dragging"));
   dropZone?.addEventListener("drop", event => { event.preventDefault(); dropZone.classList.remove("dragging"); handleFiles(product,event.dataTransfer.files); });
   document.querySelectorAll("[data-remove-file]").forEach(button => button.addEventListener("click", () => {
+    session.checkpoint = null;
+    session.error = "";
     session.attachments = session.attachments.filter(file=>file.id !== button.dataset.removeFile);
+    persist();
     renderTool(product);
   }));
   document.querySelector("#generatorForm")?.addEventListener("submit", event => {
@@ -657,10 +672,16 @@ function bindTool(product) {
   });
   document.querySelectorAll("#generatorForm input,#generatorForm textarea,#generatorForm select").forEach(field => field.addEventListener("input", () => {
     session.values[field.name] = field.value;
+    if (session.checkpoint) {
+      session.error = "";
+      document.querySelector(".recovery-banner")?.remove();
+    }
+    session.checkpoint = null;
     persist();
   }));
   document.querySelector("[data-fill-sample]")?.addEventListener("click", () => {
     session.values = deepCopy(specs[product.id].sample);
+    session.checkpoint = null;
     session.error = "";
     persist();
     renderTool(product);
@@ -676,7 +697,11 @@ function bindTool(product) {
     }
   });
   document.querySelectorAll("[data-back-input]").forEach(button => button.addEventListener("click", () => { session.view = "input"; renderTool(product); }));
-  document.querySelector("[data-regenerate]")?.addEventListener("click", () => generate(product));
+  document.querySelector("[data-regenerate]")?.addEventListener("click", () => { session.checkpoint=null; generate(product); });
+  document.querySelector("[data-resume-generation]")?.addEventListener("click", () => {
+    const instruction=session.checkpoint?.refineInstruction || "";
+    if (!document.querySelector("#generatorForm") || collectForm(product)) generate(product,instruction);
+  });
   document.querySelector("[data-refine]")?.addEventListener("click", () => {
     const value = document.querySelector("#refineInput").value.trim();
     if (!value) { document.querySelector("#refineInput").focus(); showToast("请先写下你希望怎么修改"); return; }
@@ -703,6 +728,7 @@ function bindTool(product) {
     session.values = defaultValues(product.id);
     session.result = null;
     session.attachments = [];
+    session.checkpoint = null;
     session.view = "input";
     session.error = "";
     session.refine = "";

@@ -30,12 +30,13 @@ for (const id of ids) {
 }
 
 const appSource = fs.readFileSync(new URL("../dist/app.js", import.meta.url), "utf8");
+const generationSource = appSource + fs.readFileSync(new URL("../dist/generation-core.js", import.meta.url),"utf8");
 assert.match(appSource, /resultResponseSchema/, "生成请求必须携带成果结构 Schema");
 assert.match(appSource, /parsed\.sections\.length !== spec\.sections\.length/, "生成结果必须校验章节数量");
 assert.match(appSource, /unusableResultPattern/, "生成结果必须拦截占位词和内部协议说明");
-assert.match(appSource, /模型连续两次未生成完整成果/, "自动返工失败后必须停止展示半成品");
-assert.match(appSource, /严格的交付审稿人/, "生成成果展示前必须经过事实与一致性审稿");
-assert.match(appSource, /用户未提供的角色、数量、频次、目标值、工具和责任安排/, "审稿必须识别模型擅自补充的组织事实与方案参数");
+assert.match(generationSource, /validateResult\(reviewed\)/, "断点成果必须通过最终检查后才能展示");
+assert.match(generationSource, /严格的交付审稿人/, "生成成果展示前必须经过事实与一致性审稿");
+assert.match(generationSource, /用户未提供的角色、数量、频次、目标值、工具和责任安排/, "审稿必须识别模型擅自补充的组织事实与方案参数");
 assert.match(appSource, /normalizeGeneratedText/, "可编辑成果必须兼容并整理模型历史输出");
 assert.match(appSource, /renderInlineMarkdown/, "成果区必须安全渲染轻量 Markdown");
 assert.match(appSource, /必须使用轻量 Markdown/, "系统提示词必须约束结构化 Markdown 输出");

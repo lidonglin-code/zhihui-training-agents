@@ -3,6 +3,7 @@ import { readFile, stat, realpath } from "node:fs/promises";
 import { basename, extname, join, normalize } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { guardLocalRequest, redactProviderError, secureModelRequest, validateModelUrl } from "./server-security.mjs";
+import {resolveRequestPolicy} from "./dist/model-policy.js";
 import { unzipSync, strFromU8 } from "fflate";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 
@@ -120,7 +121,13 @@ async function callModel(config, messages, maxTokens = 6000, options = {}, reque
   if (!config?.baseUrl || !config?.model || !config?.apiKey) throw new Error("模型配置不完整");
   validateModelUrl(config.baseUrl);
   const modelUrl = validateModelUrl(endpoint(config.baseUrl));
+  const policy = resolveRequestPolicy(config,{phase:options.phase,maxTokens});
+  config = policy.config;
+  maxTokens = policy.maxTokens;
   const controller = new AbortController();
+  const cancel = () => controller.abort();
+  options.signal?.addEventListener("abort",cancel,{once:true});
+  if (options.signal?.aborted) cancel();
   const providerHost = new URL(config.baseUrl).hostname;
   const providerId = String(config.provider || "");
   const isSiliconFlow = providerId.startsWith("siliconflow") || providerHost === "api.siliconflow.cn";
@@ -129,9 +136,9 @@ async function callModel(config, messages, maxTokens = 6000, options = {}, reque
     ? {max_completion_tokens:maxTokens}
     : {max_tokens:maxTokens};
   const responseSchema = safeResponseSchema(options.responseSchema);
-  const formatField = options.jsonMode && isSiliconFlow
-    ? {response_format:responseSchema ? {type:"json_schema",json_schema:responseSchema} : {type:"json_object"}}
-    : {};
+  const supportsJson = isSiliconFlow || providerId === "deepseek" || (providerId === "qwen" && /^qwen3\.[78]-(?:plus|max|flash)/i.test(config.model));
+  const formatField = options.jsonMode && supportsJson
+    ? {response_format:isSiliconFlow && responseSchema ? {type:"json_schema",json_schema:responseSchema} : {type:"json_object"}} : {};
   let thinkingField = {};
   const wantsThinking = config.thinking === "enabled";
   const reasoningEffort = String(config.reasoningEffort || "").trim();
@@ -162,17 +169,32 @@ async function callModel(config, messages, maxTokens = 6000, options = {}, reque
     const raw = await response.text();
     let data;
     try { data = JSON.parse(raw); } catch { data = null; }
-    if (!response.ok) throw new Error(redactProviderError(data?.error?.message || data?.message || `模型服务返回 ${response.status}`, config.apiKey));
+    if (!response.ok) {
+      const message = redactProviderError(data?.error?.message || data?.message || `模型服务返回 ${response.status}`,config.apiKey);
+      const code = /余额不足|insufficient.*(?:balance|quota)|quota.*exceeded/i.test(message) ? "BALANCE"
+        : response.status === 401 ? "AUTH" : response.status === 402 ? "BALANCE"
+        : response.status === 429 || response.status >= 500 ? "SERVICE_BUSY"
+        : /model.*(?:not found|unavailable|does not exist)|模型.*(?:不存在|不可用)/i.test(message) ? "MODEL_UNAVAILABLE" : "MODEL_ERROR";
+      throw Object.assign(new Error(message),{code,retryable:code === "SERVICE_BUSY"});
+    }
+    if (!data) throw Object.assign(new Error("模型服务返回的响应无法读取"),{code:"NETWORK",retryable:true});
     const choice = data?.choices?.[0];
     const content = modelMessageText(choice?.message);
-    if (!content && options.allowReasoning && choice?.message?.reasoning_content) return "模型已成功响应";
-    if (!content && choice?.finish_reason === "length") throw new Error("模型已响应，但输出在形成正文前达到 Token 上限");
-    if (!content) throw new Error("模型服务没有返回可读取正文");
-    return content;
+    const finishReason = choice?.finish_reason || "stop";
+    const integer = value => Number.isFinite(value) ? Math.max(0,Math.floor(value)) : 0;
+    const result = {content,finishReason,usage:{promptTokens:integer(data.usage?.prompt_tokens),completionTokens:integer(data.usage?.completion_tokens),reasoningTokens:integer(data.usage?.completion_tokens_details?.reasoning_tokens)},budget:{maxTokens,reasoningEffort:config.reasoningEffort || "default"}};
+    if (options.isTest) {
+      if (!content && options.allowReasoning && choice?.message?.reasoning_content && finishReason !== "length") return {...result,content:"模型已成功响应"};
+      if (!content && finishReason === "length") throw Object.assign(new Error("连接已到达模型，但检测回复达到输出上限，请稍后重试"),{code:"OUTPUT_TRUNCATED",retryable:true});
+    }
+    // A partial body is returned with explicit termination metadata. It must
+    // never be mistaken for a complete deliverable by the generation engine.
+    if (!content && finishReason !== "length") throw Object.assign(new Error("模型服务没有返回可读取正文"),{code:finishReason === "content_filter" ? "CONTENT_FILTER" : "EMPTY_OUTPUT",retryable:finishReason !== "content_filter"});
+    return result;
   } catch (error) {
-    if (error?.name === "AbortError") throw new Error("模型响应超时，请稍后重试或减少输入材料");
-    throw new Error(redactProviderError(error?.message, config.apiKey));
-  } finally { clearTimeout(timeout); }
+    if (error?.name === "AbortError") throw Object.assign(new Error("模型响应超时，已完成内容可保留后继续"),{code:"TIMEOUT",retryable:true});
+    throw Object.assign(new Error(redactProviderError(error?.message,config.apiKey)),{code:error.code && /^[A-Z_]{3,30}$/.test(error.code) ? error.code : "NETWORK",retryable:error.retryable ?? !error.code});
+  } finally { clearTimeout(timeout); options.signal?.removeEventListener("abort",cancel); }
 }
 
 async function serveFile(req, res) {
@@ -197,6 +219,8 @@ async function serveFile(req, res) {
 
 export function createAppServer({requestModel = secureModelRequest} = {}) {
 return http.createServer(async (req, res) => {
+  const requestAbort=new AbortController();
+  res.once("close",()=>requestAbort.abort());
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("Referrer-Policy", "no-referrer");
   res.setHeader("X-Frame-Options", "DENY");
@@ -211,20 +235,21 @@ return http.createServer(async (req, res) => {
     }
     if (req.method === "POST" && req.url === "/api/model/test") {
       const {config} = await readJson(req);
-      const content = await callModel(config, [{role:"user",content:"只回复：连接成功"}], 512, {allowReasoning:true,isTest:true}, requestModel);
-      return json(res, 200, {ok:true,content});
+      const result = await callModel(config, [{role:"user",content:"只回复：连接成功"}], 512, {allowReasoning:true,isTest:true,signal:requestAbort.signal}, requestModel);
+      return json(res, 200, {ok:true,...result});
     }
     if (req.method === "POST" && req.url === "/api/model/chat") {
-      const {config,messages,maxTokens,responseSchema} = await readJson(req);
+      const {config,messages,maxTokens,responseSchema,phase} = await readJson(req);
       if (!Array.isArray(messages) || !messages.length) return json(res, 400, {error:"缺少分析内容"});
-      const safeMaxTokens = Math.max(1000, Math.min(8000, Number(maxTokens) || 6000));
-      const content = await callModel(config, messages, safeMaxTokens, {jsonMode:true,responseSchema}, requestModel);
-      return json(res, 200, {ok:true,content});
+      const safeMaxTokens = resolveRequestPolicy(config,{phase,maxTokens}).maxTokens;
+      const result = await callModel(config, messages, safeMaxTokens, {jsonMode:true,responseSchema,phase,signal:requestAbort.signal}, requestModel);
+      return json(res, 200, {ok:true,...result});
     }
     if (req.method === "GET" || req.method === "HEAD") return serveFile(req, res);
     json(res, 405, {error:"不支持的请求"});
   } catch (error) {
-    json(res, 502, {error:error instanceof Error ? redactProviderError(error.message) : "本地服务错误"});
+    if (res.destroyed) return;
+    json(res, 502, {error:error instanceof Error ? redactProviderError(error.message) : "本地服务错误",code:error.code || "LOCAL_ERROR",retryable:Boolean(error.retryable)});
   }
 });
 }
